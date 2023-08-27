@@ -19,7 +19,6 @@
 #include <signal.h>
 
 #include "base64/include/libbase64.h"
-#include "X25519-AArch64/X25519-AArch64.h"
 
 #define BENCHMARK_ITERATIONS 10000
 
@@ -28,8 +27,21 @@
 #define sodium_base64_VARIANT_ORIGINAL BASE64_FORCE_NEON64
 
 #define randombytes_buf(buf, nbytes) arc4random_buf(buf, nbytes)
-#define crypto_scalarmult_base(publickey, secretkey) \
-  X25519_calc_public_key((unsigned char *) publickey, (unsigned char *) secretkey)
+
+#include "config.h"
+
+#ifdef HAVE_AVX2
+  #include "mx25519/src/amd64/scalarmult.h"
+  static const uint8_t p[] = {9};
+  #define crypto_scalarmult_base(publickey, secretkey) \
+    mx25519_scalarmult_amd64x((uint8_t *) publickey, (uint8_t *) secretkey, p)
+#endif
+
+#ifdef HAVE_NEON64
+  #include "X25519-AArch64/X25519-AArch64.h"
+  #define crypto_scalarmult_base(publickey, secretkey) \
+    X25519_calc_public_key((unsigned char *) publickey, (unsigned char *) secretkey)
+#endif
 
 void sodium_bin2base64(char * const b64, const size_t b64_maxlen,
                          const unsigned char * const bin, const size_t bin_len,

@@ -4,3 +4,6 @@
 [submodule "base64"]
 	path = src/base64
 	url = https://github.com/aklomp/base64
+[submodule "mx25519"]
+	path = src/mx25519
+	url = https://github.com/tevador/mx25519

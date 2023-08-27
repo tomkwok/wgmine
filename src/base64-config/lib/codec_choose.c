@@ -14,29 +14,19 @@
 	BASE64_ENC_FUNCTION(arch);	\
 	BASE64_DEC_FUNCTION(arch);	\
 
+BASE64_CODEC_FUNCS(avx2)
 BASE64_CODEC_FUNCS(neon64)
-
-static bool
-codec_choose_forced (struct codec *codec, int flags)
-{
-	// If the user wants to use a certain codec,
-	// always allow it, even if the codec is a no-op.
-	// For testing purposes.
-
-	if (flags & BASE64_FORCE_NEON64) {
-		codec->enc = base64_stream_encode_neon64;
-		codec->dec = base64_stream_decode_neon64;
-		return true;
-	}
-	return false;
-}
-
 
 void
 codec_choose (struct codec *codec, int flags)
 {
-	// User forced a codec:
-	if (codec_choose_forced(codec, flags)) {
-		return;
-	}
+	#ifdef HAVE_AVX2
+		codec->enc = base64_stream_encode_avx2;
+		codec->dec = base64_stream_decode_avx2;
+	#endif
+
+	#ifdef HAVE_NEON64
+		codec->enc = base64_stream_encode_neon64;
+		codec->dec = base64_stream_decode_neon64;
+	#endif
 }
