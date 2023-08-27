@@ -12,12 +12,6 @@
     <br>
     <a href="#usage"><strong>Try it out »</strong></a>
     <br>
-    <br>
-    <a href="https://hub.docker.com/r/thatsed/wgmine">DockerHub</a>
-    ·
-    <a href="https://github.com/thatsed/wgmine/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/thatsed/wgmine/issues">Request Feature</a>
   </p>
 </p>
 
@@ -66,8 +60,6 @@ with some prefix you want.
 
 This makes identifying peers in Wireguard configurations much easier, and also
 gives the owner of the key style points. 
-
-The project is written in [C](https://knowyourmeme.com/memes/i-am-speed) and uses [libsodium](https://github.com/jedisct1/libsodium) for crypto.
 
 There's also a poorely written and very slow python script inside the `py` folder if you dare tickling that beast.
 
@@ -128,35 +120,23 @@ It's also way easier to do: you just do it, you can freely choose private keys, 
 But please don't. Just let the RNG gods do that job for ya'.
 
 
-## Benchmarks
+## Benchmarks (AArch64 NEON)
 
-Tests are done on an Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz (6 cores, 12 hyperthreaded).
+Tests are done on Ampere A1 (4 cores).
 
-Multiprocessing (autodetected): 12
+Multiprocessing (autodetected): 4
 
-Speed: max 300.000 Keys/second
+#### Before optimization (with libsodium)
 
-Average times to generate one key at this rate are the following:
+```
+Benchmark result: 82431 keys/second
+```
 
-| Prefix Length | Time          |
-|---------------|---------------|
-| 1             |     <1 second |
-| 2             |     <1 second |
-| 3             |      1 second |
-| 4             |      1 minute |
-| 5             |        1 hour |
-| 6             |      2.5 days |
-| 7             |    5.5 months |
-| 8             |      30 years |
-| 9             |    2000 years |
-| 10            | 120 millennia |
+#### After optimization (with AArch64 NEON assembly implementation)
 
-
-The speed \[Keys/second\] is benchmarked automatically when starting the program.
-
-If you want to estimate the time to key generation (in seconds) use this formula: 
-
-> 64<sup>prefix_length</sup> / speed
+```
+Benchmark result: 94056 keys/second
+```
 
 
 ## Usage
@@ -164,16 +144,6 @@ If you want to estimate the time to key generation (in seconds) use this formula
 ```
 wgmine [-b] <PREFIX> [..PREFIXES]
 ```
-
-### Docker
-
-You can run it with docker:
-
-```
-$ docker run --rm thatsed/wgmine NYC+
-``` 
-
-The arguments are the same as described below.
 
 
 ### Binary
@@ -243,21 +213,17 @@ with the output of `wg pubkey`.
 ### Building from Source
 
 Install build dependencies:
-- `gcc`
-- `libsodium`
-- `cmake`
-- `make`
-
-On Ubuntu/Debian:
 
 ```
-$ sudo apt install libsodium-dev gcc make cmake
+$ sudo apt install gcc make cmake libbsd-dev
+$ sudo yum install gcc make cmake libbsd-devel
 ```
 
 Clone this repo and cd into it:
 
 ```
-$ git clone https://github.com/thatsed/wgmine.git
+$ git clone https://github.com/tomkwok/wgmine.git
+$ git submodule update --init
 $ cd wgmine
 ```
 
@@ -271,53 +237,11 @@ $ make
 The built (standalone) executable is ``wgmine``. You can install it system-wide by copying it into
 any directory in your ``PATH``, such as (usually) `/usr/local/bin`.
 
----
-
-If the program crashes and/or you are planning to run it on old/32bit hardware, 
-consider turning off the 64-bit optimization:
-
-```
-$ cmake src -DENABLE_O64=OFF
-$ make
-```
-
-This optimization provides a ~1.2% speedup (same hardware as benchmarks) by comparing 
-raw masked keys with the prefix instead of converting them to base64 first. 
-It's a little bit slower without it, but should then run on anything.
-
 
 ### Building with Docker
-
-To get it from the registry:
-
-```
-$ docker pull thatsed/wgmine
-```
 
 To build it yourself, clone the repo and then:
 
 ```
 $ docker build -t wgmine .
 ```
-
----
-
-To build the unoptimized version (non 64-bit hardware):
-
-```
-$ docker build -t wgmine:no-o64 --build-arg=ENABLE_O64=OFF .
-```
-
-
-## Contributing
-
-Feel free to contribute to the project!
-
-I'm **really** inexperienced with C so the code is what it is unfurtunately, but if you
-know of any way to improve the code, or even make it more efficient, and would like to do so
-please feel free to open a PR. 
-
-
-## License
-
-It's [MIT](LICENSE).

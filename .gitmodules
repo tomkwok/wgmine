@@ -1,0 +1,6 @@
+[submodule "X25519-AArch64"]
+	path = src/X25519-AArch64
+	url = https://github.com/Emill/X25519-AArch64
+[submodule "base64"]
+	path = src/base64
+	url = https://github.com/aklomp/base64

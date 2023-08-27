@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -8,13 +9,43 @@
 #include <sys/mman.h>
 #include <time.h>
 #include <math.h>
-#include <byteswap.h>
+
+#if defined(__linux__)
+#include <bsd/stdlib.h>
+#endif
+
 #include <pthread.h>
 #include <assert.h>
+#include <signal.h>
 
-#include <sodium.h>
+#include "base64/include/libbase64.h"
+#include "X25519-AArch64/X25519-AArch64.h"
 
-#define BENCHMARK_ITERATIONS 2000
+#define BENCHMARK_ITERATIONS 10000
+
+#define crypto_box_PUBLICKEYBYTES 32
+#define crypto_box_SECRETKEYBYTES 32
+#define sodium_base64_VARIANT_ORIGINAL BASE64_FORCE_NEON64
+
+#define randombytes_buf(buf, nbytes) arc4random_buf(buf, nbytes)
+#define crypto_scalarmult_base(publickey, secretkey) \
+  X25519_calc_public_key((unsigned char *) publickey, (unsigned char *) secretkey)
+
+void sodium_bin2base64(char * const b64, const size_t b64_maxlen,
+                         const unsigned char * const bin, const size_t bin_len,
+                         const int variant)
+{
+/*
+  void base64_encode(const char *src, size_t srclen,
+                     char *out, size_t *outlen,
+                     int flags);
+*/
+  size_t outlen;
+  base64_encode((const char *) bin, bin_len,
+               b64, &outlen,
+               variant);
+  b64[outlen] = '\0';
+}
 
 struct control_data
 {
@@ -24,124 +55,12 @@ struct control_data
 
 static struct control_data *control = NULL;
 
-#ifdef O64
-static const char decoding[] = {62, -1, -1, -1, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1, -2, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1, -1, -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51};
-
-// pthread_mutex_t print_result_mutex;
-
-uint64_t b64_decode_filter(const char *src)
-{
-  size_t len = strlen(src);
-  size_t end_shift = 64 - 6 * len;
-  uint64_t result = 0;
-
-  for (size_t i = 0; i < len; i++)
-  {
-    result <<= 6;
-    result += (uint64_t)decoding[src[i] - '+'];
-  }
-  return __bswap_64(result << end_shift);
-}
-
-uint64_t b64_decode_mask(const char *src)
-{
-  size_t len = strlen(src);
-  size_t end_shift = 64 - 6 * len;
-  uint64_t result = -1;
-  return __bswap_64(result << end_shift);
-}
-
-void mine_keys(char const *filters[], size_t filters_len, size_t iterations, bool stop_on_find)
-{
-  uint64_t publickey[crypto_box_PUBLICKEYBYTES / 8];
-  uint64_t secretkey[crypto_box_SECRETKEYBYTES / 8];
-  char b64publickey[128];
-  char b64privatekey[128];
-  uint64_t filter_values[filters_len];
-  uint64_t filter_masks[filters_len];
-
-  for (size_t i = 0; i < filters_len; i++)
-  {
-    filter_values[i] = b64_decode_filter(filters[i]);
-    filter_masks[i] = b64_decode_mask(filters[i]);
-  }
-
-  if (iterations)
-  {
-    for (size_t c = 0; c < iterations; c++)
-    {
-      randombytes_buf((char *)secretkey, sizeof secretkey);
-      crypto_scalarmult_base((char *)publickey, (char *)secretkey);
-
-      for (size_t i = 0; i < filters_len; i++)
-      {
-        if (filter_values[i] == (publickey[0] & filter_masks[i]))
-        {
-          pthread_mutex_lock(&control->mutex);
-          if (control->done)
-          {
-            // discard solution to guarantee single result to output
-            pthread_mutex_unlock(&control->mutex);
-            return;
-          }
-          sodium_bin2base64(b64publickey, sizeof b64publickey, (char *)publickey, sizeof publickey, sodium_base64_VARIANT_ORIGINAL);
-          sodium_bin2base64(b64privatekey, sizeof b64privatekey, (char *)secretkey, sizeof publickey, sodium_base64_VARIANT_ORIGINAL);
-          fprintf(stdout, "%s %s\n", b64publickey, b64privatekey);
-          fflush(stdout);
-          if (stop_on_find)
-          {
-            control->done = true;
-            pthread_mutex_unlock(&control->mutex);
-            return;
-          }
-          pthread_mutex_unlock(&control->mutex);
-          break;
-        }
-      }
-    }
-  }
-  else
-  {
-    for (;;)
-    {
-      randombytes_buf((char *)secretkey, sizeof secretkey);
-      crypto_scalarmult_base((char *)publickey, (char *)secretkey);
-
-      for (size_t i = 0; i < filters_len; i++)
-      {
-        if (filter_values[i] == (publickey[0] & filter_masks[i]))
-        {
-          pthread_mutex_lock(&control->mutex);
-          if (control->done)
-          {
-            // discard solution to guarantee single result to output
-            pthread_mutex_unlock(&control->mutex);
-            return;
-          }
-          sodium_bin2base64(b64publickey, sizeof b64publickey, (char *)publickey, sizeof publickey, sodium_base64_VARIANT_ORIGINAL);
-          sodium_bin2base64(b64privatekey, sizeof b64privatekey, (char *)secretkey, sizeof publickey, sodium_base64_VARIANT_ORIGINAL);
-          fprintf(stdout, "%s %s\n", b64publickey, b64privatekey);
-          fflush(stdout);
-          if (stop_on_find)
-          {
-            control->done = true;
-            pthread_mutex_unlock(&control->mutex);
-            return;
-          }
-          pthread_mutex_unlock(&control->mutex);
-          break;
-        }
-      }
-    }
-  }
-}
-#else
 void mine_keys(char const *filters[], size_t filters_len, size_t iterations, bool stop_on_find)
 {
   unsigned char publickey[crypto_box_PUBLICKEYBYTES];
   unsigned char secretkey[crypto_box_SECRETKEYBYTES];
-  char b64publickey[128];
-  char b64privatekey[128];
+  char b64publickey[45];
+  char b64privatekey[45];
   size_t filters_lengths[filters_len];
 
   for (size_t i = 0; i < filters_len; i++)
@@ -218,7 +137,6 @@ void mine_keys(char const *filters[], size_t filters_len, size_t iterations, boo
     }
   }
 }
-#endif
 
 float benchmark(unsigned cpus, unsigned filters_len, unsigned iterations)
 {
@@ -296,13 +214,6 @@ int main(int argc, char const *argv[])
   for (size_t i = 1 + batch_mode_enabled; i < argc; i++)
   {
     size_t len = strlen(argv[i]);
-#ifdef O64
-    if (len > 12)
-    {
-      fprintf(stderr, "Value too long. 'O64' Optimization hard limits values to 12 characters. Then again, this would take millennia.\n");
-      return -1;
-    }
-#endif
     if (len > 8)
     {
       fprintf(stderr, "Your values **may** be too log. Good luck.\n");
