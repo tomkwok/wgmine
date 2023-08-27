@@ -21,7 +21,7 @@ include_directories(base64-config/lib)
 set(SOURCE_FILES
     base64/lib/lib.c
     base64/lib/tables/tables.c
-    base64/lib/arch/avx2/codec.c
+    base64/lib/arch/avx/codec.c
     base64/lib/arch/neon64/codec.c
     base64-config/lib/codec_choose.c
     ${SOURCE_FILES_X25519}

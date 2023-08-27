@@ -1,6 +1,6 @@
 #if defined(__x86_64__)
-  // assume AVX2 is supported
-  #define HAVE_AVX2 1
+  // assume AVX is supported
+  #define HAVE_AVX 1
 #endif
 
 #if defined(__aarch64__) && (defined(__ARM_NEON__) || defined(__ARM_NEON))

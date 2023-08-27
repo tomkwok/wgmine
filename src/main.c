@@ -30,7 +30,7 @@
 
 #include "config.h"
 
-#ifdef HAVE_AVX2
+#ifdef HAVE_AVX
   #include "mx25519/src/amd64/scalarmult.h"
   static const uint8_t p[] = {9};
   #define crypto_scalarmult_base(publickey, secretkey) \

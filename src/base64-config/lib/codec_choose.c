@@ -14,15 +14,15 @@
 	BASE64_ENC_FUNCTION(arch);	\
 	BASE64_DEC_FUNCTION(arch);	\
 
-BASE64_CODEC_FUNCS(avx2)
+BASE64_CODEC_FUNCS(avx)
 BASE64_CODEC_FUNCS(neon64)
 
 void
 codec_choose (struct codec *codec, int flags)
 {
-	#ifdef HAVE_AVX2
-		codec->enc = base64_stream_encode_avx2;
-		codec->dec = base64_stream_decode_avx2;
+	#ifdef HAVE_AVX
+		codec->enc = base64_stream_encode_avx;
+		codec->dec = base64_stream_decode_avx;
 	#endif
 
 	#ifdef HAVE_NEON64
